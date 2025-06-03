@@ -73,6 +73,21 @@
   box-sizing: border-box;
 }
 
+.ascii-banner.full-screen {
+  width: 100vw;
+  height: calc(100vh - 80px);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 80px;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  line-height: 1.05;
+}
+
 .full-screen-banner {
   position: fixed;
   top: 0;
@@ -80,25 +95,24 @@
   width: 100vw;
   height: 100vh;
   background-color: #1E201E;
-  display: flex;
-  justify-content: center;
-  align-items: center;
   z-index: 1000;
   outline: none;
+  display: block;
 }
 
 .banner-exit-message {
-  position: absolute;
-  bottom: 40px;
+  position: fixed;
+  bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
   color: #AAB99A;
   font-family: "Cascadia Code", monospace;
-  font-size: 18px;
-  padding: 10px 20px;
+  font-size: 16px;
+  padding: 8px 16px;
   border: 2px solid #AAB99A;
   border-radius: 5px;
-  background-color: rgba(30, 32, 30, 0.8);
+  background-color: rgba(30, 32, 30, 0.9);
+  z-index: 1001;
 }
 
 a {

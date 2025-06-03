@@ -6,9 +6,18 @@ const ASCIIBanner = ({ size = "small", fullScreen = false }) => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
   const [dimensions, setDimensions] = useState({ width: 80, height: 10 })
   const containerRef = useRef(null)
+  // Store previous mouse position and animation state in a ref to avoid re-renders
+  const animRef = useRef({
+    prevMouseX: 0,
+    prevMouseY: 0,
+    blobPos1: { x: 0.3, y: 0.5 },
+    blobPos2: { x: 0.7, y: 0.3 }
+  })
 
   const chars = "⊘ ⊙ ◉ ⦿ ○ ●"
-  const baseFontSize = size === "medium" ? "1.2vw" : "1.8vw"
+  const baseFontSize = fullScreen 
+    ? `${window.innerWidth * 0.018}px`
+    : size === "medium" ? "1.2vw" : "1.8vw"
 
   const staticText = [
     " _  _  ____  _  _  ____  _  _    ____  _____  _  _  ___  ",
@@ -22,20 +31,30 @@ const ASCIIBanner = ({ size = "small", fullScreen = false }) => {
     const updateDimensions = () => {
       if (!containerRef.current) return
       
-      const containerWidth = containerRef.current.offsetWidth
-      const containerHeight = containerRef.current.offsetHeight
+      let containerWidth, containerHeight
       
-      // Calculate character size based on font size
+      if (fullScreen) {
+        // Use viewport dimensions for full-screen mode
+        containerWidth = window.innerWidth
+        // Use full viewport height for full-screen mode
+        containerHeight = window.innerHeight
+      } else {
+        containerWidth = containerRef.current.offsetWidth
+        containerHeight = containerRef.current.offsetHeight
+      }
+      
+      // Calculate character size based on font size - make full screen bigger
       const fontSize = fullScreen ? window.innerWidth * 0.018 : window.innerWidth * 0.012
       const charWidth = fontSize * 0.6
+      const lineHeight = fontSize * 1.05
       
       // Calculate how many characters can fit in the container width
-      const width = Math.floor(containerWidth / charWidth) - 2
+      const width = Math.floor(containerWidth / charWidth)
       const height = fullScreen 
-        ? Math.floor(containerHeight / (fontSize * 1.2)) - 4 
+        ? Math.floor(containerHeight / lineHeight)
         : Math.min(14, Math.floor(containerHeight / (fontSize * 1.2)))
       
-      setDimensions({ width: Math.max(width, 60), height: Math.max(height, 3) })
+      setDimensions({ width: Math.max(width, 60), height: Math.max(height, 10) })
     }
 
     // Initial update
@@ -44,12 +63,14 @@ const ASCIIBanner = ({ size = "small", fullScreen = false }) => {
     // Update on resize
     window.addEventListener("resize", updateDimensions)
     
-    // Also update when container is ready
+    // Also update when container is ready and when fullScreen changes
     const timer = setTimeout(updateDimensions, 100)
+    const delayedTimer = setTimeout(updateDimensions, 300)
     
     return () => {
       window.removeEventListener("resize", updateDimensions)
       clearTimeout(timer)
+      clearTimeout(delayedTimer)
     }
   }, [fullScreen])
 
@@ -60,9 +81,16 @@ const ASCIIBanner = ({ size = "small", fullScreen = false }) => {
     return () => clearInterval(timer)
   }, [])
 
+  // Helper function to smoothly interpolate between values
+  const lerp = (start, end, factor) => {
+    return start + (end - start) * factor
+  }
+
   const handleMouseMove = (e) => {
     if (!containerRef.current) return
     const rect = containerRef.current.getBoundingClientRect()
+    
+    // Update mouse position state
     setMousePos({
       x: (e.clientX - rect.left) / rect.width,
       y: (e.clientY - rect.top) / rect.height,
@@ -72,8 +100,22 @@ const ASCIIBanner = ({ size = "small", fullScreen = false }) => {
   const generateAsciiFrame = () => {
     let art = ""
     const { width, height } = dimensions
-    const frequency = 0.1
-    const timeScale = frame * 0.03
+    const frequency = 0.09  // Slightly reduced frequency for smoother waves
+    const timeScale = frame * 0.025  // Slowed down time scale for more natural movement
+    
+    // Get current animation state
+    const anim = animRef.current;
+    
+    // Smoothly interpolate mouse position (using ref to avoid re-renders)
+    anim.prevMouseX = lerp(anim.prevMouseX, mousePos.x, 0.1);
+    anim.prevMouseY = lerp(anim.prevMouseY, mousePos.y, 0.1);
+    
+    // Update blob positions with smoother movement (using ref to avoid re-renders)
+    anim.blobPos1.x = lerp(anim.blobPos1.x, 0.3 + Math.sin(timeScale) * 0.15, 0.03);
+    anim.blobPos1.y = lerp(anim.blobPos1.y, 0.5 + Math.cos(timeScale * 0.7) * 0.08, 0.03);
+    
+    anim.blobPos2.x = lerp(anim.blobPos2.x, 0.7 + Math.cos(timeScale * 0.8) * 0.12, 0.03);
+    anim.blobPos2.y = lerp(anim.blobPos2.y, 0.3 + Math.sin(timeScale * 0.9) * 0.06, 0.03);
 
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
@@ -85,42 +127,53 @@ const ASCIIBanner = ({ size = "small", fullScreen = false }) => {
           continue
         }
 
-        const dx = x / width - mousePos.x
-        const dy = y / height - mousePos.y
-        const mouseInfluence = Math.exp(-(dx * dx + dy * dy) * 1.5) * 2
+        const dx = x / width - anim.prevMouseX
+        const dy = y / height - anim.prevMouseY
+        const distanceSquared = dx * dx + dy * dy
+        
+        // More gradual mouse influence with smoother falloff
+        const mouseInfluence = Math.exp(-distanceSquared * 1.2) * 1.8
 
-        const xOffset = Math.sin(timeScale + y * 0.1) * (2 + mouseInfluence * 3)
-        const yOffset = Math.cos(timeScale * 0.7 + x * 0.1) * (2 + mouseInfluence * 3)
+        // Smoother offsets with reduced amplitude and more natural flow
+        const xOffset = Math.sin(timeScale + y * 0.08) * (1.5 + mouseInfluence * 2.5)
+        const yOffset = Math.cos(timeScale * 0.65 + x * 0.08) * (1.5 + mouseInfluence * 2.5)
 
         const sampleX = x + xOffset
         const sampleY = y + yOffset
 
+        // Smoother wave pattern with more harmonics for natural movement
         const wave =
-          Math.sin(sampleX * frequency + timeScale) * 0.3 +
-          Math.sin((sampleX + sampleY) * frequency * 0.5 + timeScale * 1.1) * 0.3 +
-          Math.sin(sampleY * frequency * 0.7 + timeScale * 0.9) * 0.3
+          Math.sin(sampleX * frequency + timeScale) * 0.25 +
+          Math.sin((sampleX + sampleY) * frequency * 0.5 + timeScale * 1.05) * 0.25 +
+          Math.sin(sampleY * frequency * 0.65 + timeScale * 0.85) * 0.25 +
+          Math.sin((sampleX * 0.7 - sampleY * 0.3) * frequency * 0.4 + timeScale * 0.95) * 0.15;
 
+        // Smoother blob movement with updated positions
         const blob =
           Math.exp(
             -(
-              (x - width * 0.3 + Math.sin(timeScale) * 10) ** 2 +
-              (y - height * 0.5 + Math.cos(timeScale * 0.7) * 5) ** 2
+              (x - width * anim.blobPos1.x) ** 2 +
+              (y - height * anim.blobPos1.y) ** 2
             ) * 0.001,
           ) +
           Math.exp(
             -(
-              (x - width * 0.7 + Math.cos(timeScale * 0.8) * 8) ** 2 +
-              (y - height * 0.3 + Math.sin(timeScale * 0.9) * 4) ** 2
+              (x - width * anim.blobPos2.x) ** 2 +
+              (y - height * anim.blobPos2.y) ** 2
             ) * 0.001,
           )
 
-        const value = (wave + blob * 0.5 + mouseInfluence * 0.5) / 2
+        // Combine effects with smoother blending
+        const value = (wave + blob * 0.45 + mouseInfluence * 0.45) / 2
+        
+        // Ensure smooth mapping to character set
         const normalized = Math.min(Math.max((value + 1) / 2, 0), 0.99)
         const charIndex = Math.floor(normalized * chars.length)
         art += chars[charIndex]
       }
       art += "\n"
     }
+    
     return art
   }
 
@@ -131,12 +184,14 @@ const ASCIIBanner = ({ size = "small", fullScreen = false }) => {
       onMouseMove={handleMouseMove}
       style={{
         whiteSpace: "pre",
-        lineHeight: "1em",
+        lineHeight: fullScreen ? "1.05" : "1em",
         letterSpacing: "0.1em",
-        width: "100%",
+        width: fullScreen ? "100vw" : "100%",
+        height: fullScreen ? "100vh" : "auto",
         maxWidth: "100%",
         fontSize: baseFontSize,
         fontFamily: "'TerminalFont', monospace",
+        display: "block",
       }}
     >
       {generateAsciiFrame()}
@@ -196,7 +251,7 @@ function App() {
     "",
     "Hi, my name is Kevin Dong!",
     "",
-    "I am currently a Sophomore majoring in Computer Science and minoring Data Science at New York University. I am a curious and avid learner, passionate about software development, quantitative finance, and data science.",
+    "I am currently a Junior majoring in Computer Science and minoring Data Science at New York University. I am a curious and avid learner, passionate about software development, quantitative finance, and data science.",
   ]
 
   const social = [

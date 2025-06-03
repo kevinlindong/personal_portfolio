@@ -68,6 +68,9 @@
   padding: 0;
   background-color: transparent;
   color: #AAB99A;
+  width: 100%;
+  display: block;
+  box-sizing: border-box;
 }
 
 .full-screen-banner {

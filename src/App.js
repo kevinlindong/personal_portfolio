@@ -20,16 +20,37 @@ const ASCIIBanner = ({ size = "small", fullScreen = false }) => {
 
   useEffect(() => {
     const updateDimensions = () => {
-      const innerWidth = window.innerWidth
-      const innerHeight = window.innerHeight
-      const width = Math.floor(innerWidth / 20)
-      const height = fullScreen ? Math.floor(innerHeight / 25) : Math.min(9, Math.floor(innerWidth / 140))
-      setDimensions({ width, height })
+      if (!containerRef.current) return
+      
+      const containerWidth = containerRef.current.offsetWidth
+      const containerHeight = containerRef.current.offsetHeight
+      
+      // Calculate character size based on font size
+      const fontSize = fullScreen ? window.innerWidth * 0.018 : window.innerWidth * 0.012
+      const charWidth = fontSize * 0.6
+      
+      // Calculate how many characters can fit in the container width
+      const width = Math.floor(containerWidth / charWidth) - 2
+      const height = fullScreen 
+        ? Math.floor(containerHeight / (fontSize * 1.2)) - 4 
+        : Math.min(14, Math.floor(containerHeight / (fontSize * 1.2)))
+      
+      setDimensions({ width: Math.max(width, 60), height: Math.max(height, 3) })
     }
 
+    // Initial update
     updateDimensions()
+    
+    // Update on resize
     window.addEventListener("resize", updateDimensions)
-    return () => window.removeEventListener("resize", updateDimensions)
+    
+    // Also update when container is ready
+    const timer = setTimeout(updateDimensions, 100)
+    
+    return () => {
+      window.removeEventListener("resize", updateDimensions)
+      clearTimeout(timer)
+    }
   }, [fullScreen])
 
   useEffect(() => {

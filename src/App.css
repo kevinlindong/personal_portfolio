@@ -1,11 +1,18 @@
+:root {
+  --accent: #AAB99A;
+  --accent-light: #D0DDD0;
+  --bg: #1E201E;
+  --text: #ECDFCC;
+}
+
 .App {
-  background-color: #1E201E;
+  background-color: var(--bg);
   color: white;
   height: 100vh;
   padding: 1rem;
   box-sizing: border-box;
   overflow: hidden;
-  border: 3px solid #AAB99A;
+  border: 3px solid var(--accent);
   border-radius: 10px;
   display: flex;
   flex-direction: column;
@@ -13,14 +20,13 @@
 
 .terminal {
   flex-grow: 1;
-  overflow-y: auto;
+  overflow-y: scroll;
   white-space: pre-wrap;
   font-family: "Cascadia Code", monospace;
   font-size: 16px;
   line-height: 1.5;
-  color: #ECDFCC;
+  color: var(--text);
   padding-bottom: 1rem;
-  scroll-behavior: smooth;
 }
 
 .terminal-line {
@@ -29,7 +35,7 @@
 }
 
 .prompt {
-  color: #AAB99A;
+  color: var(--accent);
   font-weight: 550;
 }
 
@@ -37,29 +43,31 @@
   background-color: transparent;
   border: none;
   outline: none;
-  color: #AAB99A;
+  color: var(--accent);
   font-family: "Cascadia Code", monospace;
   font-size: 16px;
   font-weight: 550;
-  caret-color: #AAB99A;
+  caret-color: var(--accent);
   width: calc(100% - 20px);
   display: inline;
-  position: relative;
-  top: -1px;
+  padding: 0;
+  margin: 0;
+  line-height: 1.5;
 }
 
 .input-line {
   display: flex;
   align-items: center;
+  min-height: 24px;
 }
 
 .intro {
-  color: #ECDFCC;
+  color: var(--text);
   font-weight: 550;
 }
 
 .key {
-  color: #AAB99A;
+  color: var(--accent);
   font-weight: 550;
 }
 
@@ -67,20 +75,44 @@
   margin: 0;
   padding: 0;
   background-color: transparent;
-  color: #AAB99A;
+  color: var(--accent);
   width: 100%;
   display: block;
   box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+.ascii-banner.dot-matrix {
+  cursor: crosshair;
+}
+
+.ascii-banner.dot-matrix::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 2;
 }
 
 .ascii-banner.full-screen {
-  width: 100vw;
-  height: calc(100vh - 80px);
-  position: fixed;
+  width: 100%;
+  height: 100%;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  bottom: 80px;
+  bottom: 0;
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -88,16 +120,21 @@
   line-height: 1.05;
 }
 
+
+
 .full-screen-banner {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: #1E201E;
+  background-color: var(--bg);
   z-index: 1000;
   outline: none;
   display: block;
+  border: 3px solid var(--accent);
+  border-radius: 10px;
+  box-sizing: border-box;
 }
 
 .banner-exit-message {
@@ -105,34 +142,82 @@
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  color: #AAB99A;
+  color: var(--accent);
   font-family: "Cascadia Code", monospace;
   font-size: 16px;
   padding: 8px 16px;
-  border: 2px solid #AAB99A;
+  border: 2px solid var(--accent);
   border-radius: 5px;
   background-color: rgba(30, 32, 30, 0.9);
   z-index: 1001;
 }
 
 a {
-  color: #D0DDD0;
+  color: var(--accent-light);
   text-decoration: none;
   transition: color 0.3s ease;
 }
 
 a:hover {
-  color: #AAB99A;
+  color: var(--accent);
   text-decoration: underline;
 }
 
 .terminal-line a {
-  color: #D0DDD0;
+  color: var(--accent-light);
   text-decoration: none;
   transition: color 0.3s ease;
 }
 
 .terminal-line a:hover {
-  color: #AAB99A;
+  color: var(--accent);
   text-decoration: underline;
+}
+
+.snake-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--bg);
+  z-index: 1000;
+  border: 3px solid var(--accent);
+  border-radius: 10px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.snake-canvas {
+  display: block;
+  position: absolute;
+  top: 32px;
+  left: 0;
+}
+
+.snake-hud {
+  position: absolute;
+  left: 0;
+  right: 0;
+  padding: 6px 14px;
+  color: var(--accent);
+  font-family: "Cascadia Code", monospace;
+  font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+  z-index: 1;
+  border-bottom: 1px solid var(--accent);
+}
+
+.snake-hud-top {
+  top: 0;
+}
+
+.snake-hud-bottom {
+  bottom: 0;
+  border-bottom: none;
+  border-top: 1px solid var(--accent);
+  justify-content: center;
+  font-size: 13px;
+  opacity: 0.7;
 }

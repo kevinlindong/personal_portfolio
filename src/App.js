@@ -34,7 +34,7 @@ class PerlinNoise {
 
 const perlinNoise = new PerlinNoise()
 // Circle character ramp — sparse → dense for lava-lamp blob look
-const CHAR_RAMP = [' ', ' ', '·', '◦', '○', '◎', '◉', '●']
+const CHAR_RAMP = [' ', ' ', ' ', '·', '◦', '○', '◎', '◉', '●'].reverse()
 // Low scale = fewer, larger blobs (lava lamp feel)
 const NOISE_SCALE = 1.4
 // Char aspect ratio correction: chars are ~0.57x as wide as tall
@@ -58,25 +58,23 @@ const STATIC_TEXT = [
 const STATIC_TEXT_HEIGHT = STATIC_TEXT.length
 const STATIC_TEXT_WIDTH  = Math.max(...STATIC_TEXT.map(l => l.length))
 
-// Per-row horizontal span (first/last non-space column)
-const TEXT_ROW_SPAN = STATIC_TEXT.map(line => {
-  const first = line.search(/\S/)
-  const last  = first >= 0 ? line.trimEnd().length - 1 : -1
-  return { first, last }
-})
-
-// Per-column vertical span (first/last row with a non-space char)
-const TEXT_COL_SPAN = Array.from({ length: STATIC_TEXT_WIDTH }, (_, tx) => {
-  let first = -1, last = -1
-  for (let ty = 0; ty < STATIC_TEXT_HEIGHT; ty++) {
-    const ln = STATIC_TEXT[ty]
-    if (tx < ln.length && ln[tx] !== ' ') {
-      if (first === -1) first = ty
-      last = ty
+// Precompute: set of "ty,tx" positions that are 1 char adjacent to any non-space
+// character in STATIC_TEXT. Used to blank out a 1-char padding zone around each
+// letter stroke so the animation never touches the text directly.
+const TEXT_PADDING_SET = new Set()
+for (let ty = 0; ty < STATIC_TEXT_HEIGHT; ty++) {
+  for (let tx = 0; tx < STATIC_TEXT_WIDTH; tx++) {
+    const line = STATIC_TEXT[ty]
+    if (tx < line.length && line[tx] !== ' ') {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dy === 0 && dx === 0) continue
+          TEXT_PADDING_SET.add(`${ty + dy},${tx + dx}`)
+        }
+      }
     }
   }
-  return { first, last }
-})
+}
 
 const ASCIIBanner = ({ fullScreen = false }) => {
   const [frame, setFrame] = useState(0)
@@ -160,27 +158,22 @@ const ASCIIBanner = ({ fullScreen = false }) => {
 
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        // Text overlay: non-space chars render as-is; spaces stay blank only if
-        // interior to the letter forms (bound both horizontally and vertically).
-        // Leading/trailing blank areas fall through to animation.
-        if (showText && x < STATIC_TEXT_WIDTH) {
+        // Text overlay: render non-space chars; blank the 1-char padding zone
+        // around each letter stroke so animation never touches the text.
+        if (showText) {
           const ty = y - textStartY
-          if (ty >= 0 && ty < STATIC_TEXT_HEIGHT) {
+          const tx = x
+          if (ty >= 0 && ty < STATIC_TEXT_HEIGHT && tx >= 0 && tx < STATIC_TEXT_WIDTH) {
             const line = STATIC_TEXT[ty]
-            const ch = x < line.length ? line[x] : ' '
+            const ch = tx < line.length ? line[tx] : ' '
             if (ch !== ' ') {
               art += ch
               continue
             }
-            const { first: rFirst, last: rLast } = TEXT_ROW_SPAN[ty]
-            if (rFirst >= 0 && x >= rFirst && x <= rLast) {
-              const { first: cFirst, last: cLast } = TEXT_COL_SPAN[x]
-              if (cFirst >= 0 && ty >= cFirst && ty <= cLast) {
-                art += ' '  // visually interior space → stay blank
-                continue
-              }
-            }
-            // Exterior space → fall through to animation
+          }
+          if (TEXT_PADDING_SET.has(`${ty},${tx}`)) {
+            art += ' '
+            continue
           }
         }
 
@@ -200,11 +193,12 @@ const ASCIIBanner = ({ fullScreen = false }) => {
           const dxc = dx * width
           const dyc = dy * height * CHAR_AR
           const d2c = dxc * dxc + dyc * dyc
-          // Radius ≈ 18 chars; beyond that the influence drops to near zero
-          const inf = Math.exp(-d2c / 220)
-          const dist = Math.sqrt(dx * dx + dy * dy) || 0.001
-          mu = -(dx / dist) * inf * 0.38
-          mv = -(dy / dist) * inf * 0.38
+          // Smooth lens distortion: displace proportional to (dx, dy) rather than
+          // a unit vector, so the effect is zero at the cursor center and builds
+          // gradually — no singularity, no collapsed noise at the hotspot.
+          const inf = Math.exp(-d2c / 320)
+          mu = -dx * inf * 1.8
+          mv = -dy * inf * 1.8
 
           // Trail: ghost attractors that leave a flowing wake
           for (const tr of anim.trail) {
@@ -213,10 +207,9 @@ const ASCIIBanner = ({ fullScreen = false }) => {
             const tdxc = tdx * width
             const tdyc = tdy * height * CHAR_AR
             const td2c = tdxc * tdxc + tdyc * tdyc
-            const fade = Math.exp(-td2c / 65) * Math.exp(-tr.age * 2.8)
-            const td   = Math.sqrt(tdx * tdx + tdy * tdy) || 0.001
-            mu -= (tdx / td) * fade * 0.10
-            mv -= (tdy / td) * fade * 0.10
+            const fade = Math.exp(-td2c / 80) * Math.exp(-tr.age * 2.8)
+            mu -= tdx * fade * 0.5
+            mv -= tdy * fade * 0.5
           }
         }
 
@@ -319,10 +312,10 @@ const SnakeGame = ({ onExit }) => {
 
   const placeFood = (snake) => {
     const { cols, rows } = gridRef.current
-    let pos
-    do { pos = { x: Math.floor(Math.random() * cols), y: Math.floor(Math.random() * rows) } }
-    while (snake.some(s => s.x === pos.x && s.y === pos.y))
-    return pos
+    while (true) {
+      const pos = { x: Math.floor(Math.random() * cols), y: Math.floor(Math.random() * rows) }
+      if (!snake.some(s => s.x === pos.x && s.y === pos.y)) return pos
+    }
   }
 
   const resize = () => {
@@ -459,7 +452,7 @@ const SnakeGame = ({ onExit }) => {
   return (
     <div className="snake-overlay">
       <div className="snake-hud snake-hud-top">
-        <span>// SNAKE</span>
+        <span>{'// SNAKE'}</span>
         <span>score: {displayScore}</span>
       </div>
       <canvas ref={canvasRef} className="snake-canvas" />
